@@ -114,9 +114,10 @@ def _claim_card(c, f, declared):
         if adm.get("lookup"):
             url = adm["lookup"]
             if _automated(c["program"]) and f.get("postal"):
-                url = "https://autobodylocator.ca/canada/search?" + urlencode({
-                    "country": "canada", "type": "canada", "caryear": "",
-                    "search": f["postal"].replace(" ", "").upper(), "radius": "25", "page": "1"})
+                pc = "".join(f["postal"].split()).upper()
+                url = "https://autobodylocator.ca/search?" + urlencode({
+                    "search": f"{pc[:3]} {pc[3:]}" if len(pc) == 6 else pc,
+                    "radius": "25", "type": "canada", "country": "CA", "lang": "en"})
             st.link_button(f"Search the locator near {f['postal']}" if url != adm["lookup"] else adm["lookup_label"], url)
         if c.get("last_auto_check_at") and st.toggle("Show the last automated check", key=f"run_{c['id']}"):
             run = db.latest_run(c["id"])

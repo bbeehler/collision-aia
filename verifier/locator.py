@@ -41,7 +41,9 @@ WAIT_JS = "() => /location\\(s\\)|no (?:locations|results) found|aucun/i.test(do
 
 
 def search_url(query, page=1):
-    params = {"country": "canada", "type": "canada", "caryear": "", "search": query, "radius": str(settings.RADIUS), "page": str(page)}
+    params = {"search": query, "radius": str(settings.RADIUS), "type": "canada", "country": "CA", "lang": "en"}
+    if page > 1:
+        params["page"] = str(page)
     return f"{settings.BASE_URL}?{urlencode(params)}"
 
 

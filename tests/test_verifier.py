@@ -10,7 +10,7 @@ HTML = (Path(__file__).parent / "fixtures" / "results.html").read_text()
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        body = HTML if "page=1" in self.path else "<html><body><p>No locations found</p></body></html>"
+        body = HTML if "page=" not in self.path else "<html><body><p>No locations found</p></body></html>"
         self.send_response(200)
         self.send_header("content-type", "text/html")
         self.end_headers()

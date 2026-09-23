@@ -9,8 +9,8 @@ def _int(name, default):
         return default
 
 
-BASE_URL = os.environ.get("LOCATOR_BASE_URL", "https://autobodylocator.ca/canada/search")
-RADIUS = _int("LOCATOR_RADIUS", 10)
+BASE_URL = os.environ.get("LOCATOR_BASE_URL", "https://autobodylocator.ca/search")
+RADIUS = _int("LOCATOR_RADIUS", 25)
 MAX_PAGES = _int("LOCATOR_MAX_PAGES", 3)
 MIN_DELAY_MS = _int("LOCATOR_MIN_DELAY_MS", 3000)
 TIMEOUT_MS = _int("LOCATOR_TIMEOUT_MS", 25000)

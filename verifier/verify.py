@@ -37,7 +37,8 @@ def verify_facility(locator, shop, brands, evidence_key=None):
 
     queries = []
     if shop.get("postal"):
-        queries.append(shop["postal"].replace(" ", "").upper())
+        pc = "".join(shop["postal"].split()).upper()
+        queries.append(f"{pc[:3]} {pc[3:]}" if len(pc) == 6 else pc)
     if shop.get("city"):
         queries.append(f"{shop['city']}, {shop.get('province') or ''}".strip(", "))
 

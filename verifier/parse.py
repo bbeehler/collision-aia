@@ -1,5 +1,6 @@
 """Turns the raw text of one locator result card into structured fields."""
 import re
+from urllib.parse import unquote
 
 from .brands import detect_brands, normalize
 
@@ -27,6 +28,11 @@ def parse_card(raw):
     addr_line = next((l for l in lines if PROV_RE.search(l)), None)
     address = PHONE_RE.sub("", EMAIL_RE.sub("", addr_line)).strip() if addr_line else None
     province = PROV_RE.search(addr_line).group(1) if addr_line else None
+    daddr = next((unquote(h.split("daddr=", 1)[1].split("&")[0]) for h in (raw.get("links") or []) if "daddr=" in h), None)
+    if daddr and not (address and re.match(r"^\s*\d", address)):
+        address = daddr.strip()
+        pm = PROV_RE.search(daddr)
+        province = pm.group(1) if pm else province
 
     cert_lines = []
     for l in lines:
@@ -35,10 +41,13 @@ def parse_card(raw):
             continue
         if not re.sub(r"directions|email|web|courriel|itineraire", "", PHONE_RE.sub("", l), flags=re.I).strip():
             continue
+        if re.match(r"^\d+[A-Za-z-]*\s", l):  # street address line
+            continue
         if re.match(r"^https?://", l) or re.match(r"^[\w-]+\.(ca|com|net|org)\b", l, re.I):
             continue
         cert_lines.append(l)
-    cert_text = "\n".join(cert_lines + list(raw.get("alts") or []))
+    alts = [a for a in (raw.get("alts") or []) if len(a.strip()) > 2 and a.strip() != name]
+    cert_text = "\n".join(cert_lines + alts)
     profile = next((h for h in (raw.get("links") or []) if SHOP_RE.search(h)), None)
     links = [h for h in (raw.get("links") or []) if h.startswith("http") and not re.search(r"autobodylocator|google\.|maps\.", h, re.I)][:5]
     return {

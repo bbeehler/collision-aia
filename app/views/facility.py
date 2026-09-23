@@ -4,6 +4,7 @@ from datetime import date
 import streamlit as st
 
 from .. import ai, db
+from .. import locator_lookup as lookup
 from ..badge import badge_svg, show
 from ..config import (ADMINS, ANSWERS, PROGRAMS, PROVINCES, RENEW_WINDOW_DAYS, REQS, SCOPES, SECTIONS, STEPS,
                       program_admin, program_name)
@@ -93,10 +94,8 @@ def _profile(f):
                             format_func=PROVINCES.get, placeholder="Select")
         postal = c3.text_input("Postal code", f.get("postal") or "", help="Used to find your listing on CPN Auto Body Locator")
         c1, c2 = st.columns(2)
-        phone = c1.text_input("Phone", f.get("phone") or "", help="Use the number on your OEM program listings")
+        phone = c1.text_input("Phone", f.get("phone") or "", help="Use the number on your OEM program listings. It's how we find your shop on CPN Auto Body Locator.")
         web = c2.text_input("Website", f.get("website") or "")
-        locator = st.text_input("CPN Auto Body Locator profile link (optional)", f.get("locator_url") or "",
-                                help="If your shop is listed on autobodylocator.ca, open your shop's page there and paste its address here. Your OEM certifications can then be confirmed exactly.")
         scope = st.multiselect("Repair scope", SCOPES, default=[s for s in (f.get("scope") or []) if s in SCOPES])
         c1, c2 = st.columns(2)
         rep = c1.text_input("Authorized representative", f.get("rep_name") or "")
@@ -106,13 +105,10 @@ def _profile(f):
             if not legal.strip():
                 st.error("The legal business name can't be empty.")
                 return
-            if locator.strip() and not re.search(r"autobodylocator\.ca/shop/.+-\d+", locator):
-                st.error("That doesn't look like a CPN Auto Body Locator shop page. It should start with https://autobodylocator.ca/shop/")
-                return
             try:
                 db.update_facility(f["id"], {"legal_name": legal.strip(), "operating_name": op.strip() or None, "street": street.strip(),
                                              "city": city.strip(), "province": prov, "postal": postal.strip().upper(), "phone": phone.strip(),
-                                             "website": web.strip(), "locator_url": locator.strip().split("?")[0] or None, "scope": scope, "rep_name": rep.strip(), "rep_title": title.strip(),
+                                             "website": web.strip(), "scope": scope, "rep_name": rep.strip(), "rep_title": title.strip(),
                                              "rep_email": email.strip()})
                 flash("Facility details saved.")
                 st.rerun()
@@ -121,6 +117,106 @@ def _profile(f):
     miss = profile_missing(f)
     if miss:
         st.warning("Still needed before you can declare: " + ", ".join(miss) + ".")
+    _locator_section(f)
+
+
+# ---------------------------------------------------------------- CPN Auto Body Locator
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def _search(postal):
+    return lookup.search(postal)
+
+
+def _shop_id(url):
+    m = re.search(r"-(\d+)(?:/|\?|$)", url or "")
+    return m.group(1) if m else None
+
+
+def _ranked(f):
+    """Locator listings near the facility, best match first. None if the lookup can't run."""
+    if not f.get("postal") or not (f.get("phone") or f.get("street")):
+        return None
+    try:
+        return lookup.rank(f, _search(lookup.postal_query(f["postal"])))
+    except Exception:
+        return None
+
+
+def _linked_listing(f, ranked):
+    sid = _shop_id(f.get("locator_url"))
+    return next((r["listing"] for r in ranked or [] if r["listing"].get("shop_id") == sid), None) if sid else None
+
+
+def _add_listed(f, listing, key):
+    brands = [b for b in listing.get("brands", []) if b in PROGRAMS]
+    claimed = {c["program"] for c in db.claims(f["id"])}
+    missing = [b for b in brands if b not in claimed]
+    if brands:
+        st.write("Certifications listed there: " + ", ".join(program_name(b) for b in brands) + ".")
+    if missing and st.button(f"Add {', '.join(program_name(b) for b in missing)} to my credentials", key=key, type="primary"):
+        for b in missing:
+            db.add_claim(f["id"], {"program": b, "program_ref": f"CPN {listing.get('shop_id') or ''}".strip()})
+            db.log(f["id"], "claim_added", f"{b} (from locator listing)")
+        flash(f"Added {len(missing)} certification(s). They'll be confirmed against your locator listing within the hour.")
+        st.rerun()
+    elif brands:
+        st.caption("Every certification on your listing is in your credentials.")
+
+
+def _locator_section(f):
+    st.markdown("#### CPN Auto Body Locator")
+    if not f.get("postal") or not (f.get("phone") or f.get("street")):
+        st.caption("Save your street address, postal code and phone number above, and we'll look for your shop on CPN Auto "
+                   "Body Locator. Certifications listed there are confirmed automatically.")
+        return
+    with st.spinner("Looking for your shop on CPN Auto Body Locator"):
+        ranked = _ranked(f)
+    if ranked is None:
+        st.caption("CPN Auto Body Locator couldn't be reached just now. Your credentials can still be added on the Credentials tab.")
+        return
+
+    if f.get("locator_url"):
+        listing = _linked_listing(f, ranked)
+        with st.container(border=True):
+            if listing:
+                st.success(f"**Your shop on CPN Auto Body Locator:** {listing['name']}, {listing.get('address') or ''}")
+                _add_listed(f, listing, key=f"add_listed_{f['id']}")
+            else:
+                st.success("Your shop is linked to its CPN Auto Body Locator listing.")
+            c1, c2, _ = st.columns([1, 1, 2])
+            c1.link_button("View the listing", f["locator_url"])
+            if c2.button("This isn't my shop", key=f"unlink_{f['id']}"):
+                st.session_state.setdefault("locator_declined", set()).add(_shop_id(f["locator_url"]))
+                db.update_facility(f["id"], {"locator_url": None})
+                db.log(f["id"], "locator_unlinked")
+                st.rerun()
+        return
+
+    declined = st.session_state.get("locator_declined", set())
+    ranked = [r for r in ranked if r["listing"].get("shop_id") not in declined]
+    top = ranked[0] if ranked else None
+    if top and top["identity"] == "confirmed" and top["listing"].get("profile_url"):
+        db.update_facility(f["id"], {"locator_url": top["listing"]["profile_url"]})
+        db.log(f["id"], "locator_linked", f"automatic: {', '.join(top['reasons'])}")
+        st.rerun()
+
+    candidates = [r for r in ranked if r["identity"] == "possible"][:3]
+    if candidates:
+        st.write("We found shops near you on CPN Auto Body Locator. Is one of these yours?")
+        for r in candidates:
+            l = r["listing"]
+            with st.container(border=True):
+                a, b = st.columns([3, 1], vertical_alignment="center")
+                a.markdown(f"**{l['name']}**  \n{l.get('address') or ''}" + (f"  \n{l['phones'][0][:3]}-{l['phones'][0][3:6]}-{l['phones'][0][6:]}" if l.get("phones") else ""))
+                if b.button("This is my shop", key=f"pick_{f['id']}_{l.get('shop_id')}"):
+                    db.update_facility(f["id"], {"locator_url": l["profile_url"]})
+                    db.log(f["id"], "locator_linked", f"chosen by shop: {l.get('shop_id')}")
+                    st.rerun()
+        st.caption("If none of these is your shop, you can ignore this. A listing you choose is still checked against your "
+                   "phone number and address before any certification is confirmed.")
+    else:
+        st.info(f"We didn't find your shop on CPN Auto Body Locator near {lookup.postal_query(f['postal'])}. Check that your phone "
+                "number and street address match your OEM program listings. If you aren't listed there, add your certifications "
+                "on the Credentials tab and AIA Canada will confirm them.")
 
 
 # ---------------------------------------------------------------- step 2
@@ -189,6 +285,12 @@ def _credentials(f, claims):
     st.caption("List your I-CAR Gold Class status and every OEM certification you hold. Each one is confirmed with its program "
                "administrator before your badge is issued. Certifications listed on CPN Auto Body Locator are checked "
                "automatically within about an hour.")
+    if f.get("locator_url"):
+        listing = _linked_listing(f, _ranked(f))
+        if listing:
+            with st.container(border=True):
+                st.markdown(f"**From your CPN Auto Body Locator listing** ({listing['name']})")
+                _add_listed(f, listing, key=f"add_listed_creds_{f['id']}")
     if not claims:
         st.info("No credentials listed yet.")
     for c in claims:

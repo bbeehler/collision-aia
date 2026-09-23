@@ -37,9 +37,8 @@ def _domain(s):
 
 
 def score_listing(shop, listing):
-    if shop.get("locator_id") and listing.get("shop_id") == str(shop["locator_id"]):
-        return {"identity": "confirmed", "score": 100, "reasons": ["CPN Auto Body Locator profile matches"], "name_sim": 1.0}
-    reasons = []
+    id_match = bool(shop.get("locator_id")) and listing.get("shop_id") == str(shop["locator_id"])
+    reasons = ["CPN Auto Body Locator profile matches"] if id_match else []
     shop_phone = digits(shop.get("phone"))[-10:]
     phone = len(shop_phone) == 10 and shop_phone in listing["phones"]
     if phone:
@@ -69,9 +68,11 @@ def score_listing(shop, listing):
         reasons.append("email or website domain matches")
 
     score = min(100, (45 if phone else 0) + (30 if street else 10 if street_num else 0) + round(name_sim * 25) + (15 if web else 0))
-    if (phone and (street or name_sim >= 0.34 or web)) or (street and (name_sim >= 0.34 or web)):
+    if id_match and (phone or street_num or name_sim >= 0.5):
+        identity, score = "confirmed", 100
+    elif (phone and (street or name_sim >= 0.34 or web)) or (street and (name_sim >= 0.34 or web)):
         identity = "confirmed"
-    elif phone or street or web or name_sim >= 0.6:
+    elif id_match or phone or street or name_sim >= 0.6:
         identity = "possible"
     else:
         identity = "none"

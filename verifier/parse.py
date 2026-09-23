@@ -5,7 +5,8 @@ from .brands import detect_brands, normalize
 
 PROV = "AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT"
 PHONE_RE = re.compile(r"\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b")
-EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+EMAIL_RE = re.compile(r"[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}(?![A-Za-z])")
+SHOP_RE = re.compile(r"/shop/[^/?#]*?-(\d+)(?:/|\?|$)")
 PROV_RE = re.compile(rf",\s*({PROV})\b")
 DAY_RE = re.compile(r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)")
 UI_RE = re.compile(r"^(request an appointment|demander un rendez-vous|prendre rendez-vous|directions|itineraire|email|courriel|web|site web|list view|map view|back to search)$")
@@ -38,6 +39,7 @@ def parse_card(raw):
             continue
         cert_lines.append(l)
     cert_text = "\n".join(cert_lines + list(raw.get("alts") or []))
+    profile = next((h for h in (raw.get("links") or []) if SHOP_RE.search(h)), None)
     links = [h for h in (raw.get("links") or []) if h.startswith("http") and not re.search(r"autobodylocator|google\.|maps\.", h, re.I)][:5]
     return {
         "name": name,
@@ -49,6 +51,8 @@ def parse_card(raw):
         "brands": detect_brands(cert_text),
         "cert_text": cert_text[:1000],
         "links": links,
+        "shop_id": SHOP_RE.search(profile).group(1) if profile else None,
+        "profile_url": profile.split("?")[0] if profile else None,
     }
 
 

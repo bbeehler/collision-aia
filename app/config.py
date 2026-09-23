@@ -51,10 +51,10 @@ ADMINS = {
 
 PROGRAMS = {"icar-gold": ("I-CAR Gold Class", "icar"), "gm": ("GM Canada Collision Repair Network", "mitchell")}
 for _pid, _name in [("ford", "Ford"), ("stellantis", "Stellantis (Chrysler, Dodge, Jeep, Ram)"), ("kia", "Kia"), ("nissan", "Nissan"),
-                    ("infiniti", "INFINITI"), ("toyota", "Toyota"), ("lexus", "Lexus"), ("honda", "Honda"), ("hyundai", "Hyundai"),
+                    ("infiniti", "INFINITI"), ("toyota", "Toyota"), ("lexus", "Lexus"), ("honda", "Honda"), ("acura", "Acura"), ("hyundai", "Hyundai"),
                     ("genesis", "Genesis"), ("subaru", "Subaru"), ("vinfast", "VinFast")]:
     PROGRAMS[_pid] = (_name, "oec")
-for _name in ["Acura", "Audi", "BMW", "Jaguar Land Rover", "Mazda", "Mercedes-Benz", "MINI", "Mitsubishi", "Polestar", "Porsche", "Rivian",
+for _name in ["Audi", "BMW", "Jaguar Land Rover", "Mazda", "Mercedes-Benz", "MINI", "Mitsubishi", "Polestar", "Porsche", "Rivian",
               "Tesla", "Volkswagen", "Volvo"]:
     PROGRAMS["".join(c if c.isalnum() else "-" for c in _name.lower())] = (_name, "none")
 PROGRAMS["other"] = ("Other program", "none")

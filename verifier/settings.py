@@ -29,6 +29,6 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 # Brands seen on the locator's Canadian listings. Others go straight to a reviewer.
 LOCATOR_BRANDS = {
     b.strip()
-    for b in (os.environ.get("LOCATOR_BRANDS") or "ford,stellantis,kia,nissan,infiniti,toyota,lexus,honda,hyundai,genesis,subaru,vinfast").split(",")
+    for b in (os.environ.get("LOCATOR_BRANDS") or "ford,stellantis,kia,nissan,infiniti,toyota,lexus,honda,acura,hyundai,genesis,subaru,vinfast").split(",")
     if b.strip()
 }

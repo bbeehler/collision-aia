@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 import streamlit as st
@@ -91,6 +92,8 @@ def _profile(f):
         c1, c2 = st.columns(2)
         phone = c1.text_input("Phone", f.get("phone") or "", help="Use the number on your OEM program listings")
         web = c2.text_input("Website", f.get("website") or "")
+        locator = st.text_input("CPN Auto Body Locator profile link (optional)", f.get("locator_url") or "",
+                                help="If your shop is listed on autobodylocator.ca, open your shop's page there and paste its address here. Your OEM certifications can then be confirmed exactly.")
         scope = st.multiselect("Repair scope", SCOPES, default=[s for s in (f.get("scope") or []) if s in SCOPES])
         c1, c2 = st.columns(2)
         rep = c1.text_input("Authorized representative", f.get("rep_name") or "")
@@ -100,10 +103,13 @@ def _profile(f):
             if not legal.strip():
                 st.error("The legal business name can't be empty.")
                 return
+            if locator.strip() and not re.search(r"autobodylocator\.ca/shop/.+-\d+", locator):
+                st.error("That doesn't look like a CPN Auto Body Locator shop page. It should start with https://autobodylocator.ca/shop/")
+                return
             try:
                 db.update_facility(f["id"], {"legal_name": legal.strip(), "operating_name": op.strip() or None, "street": street.strip(),
                                              "city": city.strip(), "province": prov, "postal": postal.strip().upper(), "phone": phone.strip(),
-                                             "website": web.strip(), "scope": scope, "rep_name": rep.strip(), "rep_title": title.strip(),
+                                             "website": web.strip(), "locator_url": locator.strip().split("?")[0] or None, "scope": scope, "rep_name": rep.strip(), "rep_title": title.strip(),
                                              "rep_email": email.strip()})
                 flash("Facility details saved.")
                 st.rerun()

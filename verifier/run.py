@@ -30,6 +30,12 @@ def due_claims(sb):
     return pending + recheck
 
 
+def locator_id(url):
+    import re
+    m = re.search(r"-(\d+)(?:/|\?|$)", url or "")
+    return m.group(1) if m else None
+
+
 def upload_evidence(sb, paths, facility_id):
     keys = []
     for p in [p for p in paths if p]:
@@ -67,10 +73,13 @@ def main():
                 continue
             shop = {"legal_name": f["legal_name"], "operating_name": f.get("operating_name"), "street": f["street"], "city": f["city"],
                     "province": f["province"], "postal": f["postal"], "phone": f.get("phone"), "website": f.get("website"),
-                    "email": f.get("rep_email")}
+                    "email": f.get("rep_email"), "locator_id": locator_id(f.get("locator_url"))}
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
             res = verify_facility(loc, shop, sorted({c["program"] for c in fclaims}), evidence_key=f"{fid}-{stamp}")
             evidence = upload_evidence(sb, [s.get("evidence") for s in res["searches"]], fid)
+            m = res.get("match") or {}
+            if m.get("identity") == "confirmed" and not f.get("locator_url") and m["listing"].get("profile_url"):
+                sb.table("facilities").update({"locator_url": m["listing"]["profile_url"]}).eq("id", fid).execute()
             print(f"- {f['legal_name']}: " + ", ".join(f"{r['brand']}={r['reason']}" for r in res["results"]))
 
             for c in fclaims:

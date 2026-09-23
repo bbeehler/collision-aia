@@ -119,6 +119,8 @@ def _claim_card(c, f, declared):
                     "search": f"{pc[:3]} {pc[3:]}" if len(pc) == 6 else pc,
                     "radius": "25", "type": "canada", "country": "CA", "lang": "en"})
             st.link_button(f"Search the locator near {f['postal']}" if url != adm["lookup"] else adm["lookup_label"], url)
+            if _automated(c["program"]) and f.get("locator_url"):
+                st.link_button("Open the shop's locator profile", f["locator_url"])
         if c.get("last_auto_check_at") and st.toggle("Show the last automated check", key=f"run_{c['id']}"):
             run = db.latest_run(c["id"])
             if run:

@@ -37,6 +37,8 @@ def _domain(s):
 
 
 def score_listing(shop, listing):
+    if shop.get("locator_id") and listing.get("shop_id") == str(shop["locator_id"]):
+        return {"identity": "confirmed", "score": 100, "reasons": ["CPN Auto Body Locator profile matches"], "name_sim": 1.0}
     reasons = []
     shop_phone = digits(shop.get("phone"))[-10:]
     phone = len(shop_phone) == 10 and shop_phone in listing["phones"]

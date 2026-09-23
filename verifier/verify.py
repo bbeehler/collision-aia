@@ -36,12 +36,21 @@ def verify_facility(locator, shop, brands, evidence_key=None):
         return {"checked_at": checked_at, "searches": [], "match": None, "results": results}
 
     queries = []
+    if shop.get("locator_url"):
+        try:
+            pp = locator.profile_postal(shop["locator_url"])
+            print(f"  locator profile {shop.get('locator_id')}: postal code {pp}")
+            if pp:
+                queries.append(pp)
+        except Exception as e:
+            print(f"  couldn't open locator profile: {str(e).splitlines()[0][:150]}")
     if shop.get("postal"):
         pc = "".join(shop["postal"].split()).upper()
         queries.append(f"{pc[:3]} {pc[3:]}" if len(pc) == 6 else pc)
     if shop.get("city"):
         queries.append(f"{shop['city']}, {shop.get('province') or ''}".strip(", "))
 
+    queries = list(dict.fromkeys(queries))
     searches, best, err = [], None, None
     for q in queries:
         for page in range(1, settings.MAX_PAGES + 1):

@@ -60,6 +60,23 @@ class Locator:
         self._browser.close()
         self._pw.stop()
 
+    def profile_postal(self, url):
+        """Opens a shop's CPN Auto Body Locator profile and reads its postal code."""
+        import re
+        wait = self._last + settings.MIN_DELAY_MS / 1000 - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        self._last = time.time()
+        ctx = self._browser.new_context(user_agent=settings.USER_AGENT, locale="en-CA")
+        page = ctx.new_page()
+        try:
+            page.goto(url.split("?")[0] + "?lang=en", wait_until="domcontentloaded", timeout=settings.TIMEOUT_MS)
+            text = page.inner_text("body")
+        finally:
+            ctx.close()
+        m = re.search(r"\b([A-Z]\d[A-Z])\s?(\d[A-Z]\d)\b", text)
+        return f"{m.group(1)} {m.group(2)}" if m else None
+
     def load(self, url, evidence_name=None):
         wait = self._last + settings.MIN_DELAY_MS / 1000 - time.time()
         if wait > 0:

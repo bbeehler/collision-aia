@@ -1,4 +1,5 @@
 import requests
+from urllib.parse import urlencode
 import streamlit as st
 
 from .. import db
@@ -111,7 +112,12 @@ def _claim_card(c, f, declared):
             st.warning(f"Automated check: {c['note']}")
         st.caption(adm["how"].format(make=program_name(c), postal=f.get("postal") or "the shop's postal code"))
         if adm.get("lookup"):
-            st.link_button(adm["lookup_label"], adm["lookup"])
+            url = adm["lookup"]
+            if _automated(c["program"]) and f.get("postal"):
+                url = "https://autobodylocator.ca/canada/search?" + urlencode({
+                    "country": "canada", "type": "canada", "caryear": "",
+                    "search": f["postal"].replace(" ", "").upper(), "radius": "25", "page": "1"})
+            st.link_button(f"Search the locator near {f['postal']}" if url != adm["lookup"] else adm["lookup_label"], url)
         if c.get("last_auto_check_at") and st.toggle("Show the last automated check", key=f"run_{c['id']}"):
             run = db.latest_run(c["id"])
             if run:

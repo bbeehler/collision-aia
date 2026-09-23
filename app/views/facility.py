@@ -22,6 +22,9 @@ def render():
         _start()
         return
     ids = [f["id"] for f in facs]
+    pending = st.session_state.pop("pending_facility_id", None)
+    if pending in ids:
+        st.session_state.facility_id = pending
     if st.session_state.get("facility_id") not in ids:
         st.session_state.facility_id = ids[0]
     c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
@@ -68,7 +71,7 @@ def _new_facility_form(key):
             try:
                 row = db.create_facility(name.strip())
                 db.log(row["id"], "created")
-                st.session_state.facility_id = row["id"]
+                st.session_state.pending_facility_id = row["id"]
                 st.rerun()
             except Exception as e:
                 st.error(f"The facility couldn't be created. {err_text(e)}")

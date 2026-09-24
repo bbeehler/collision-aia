@@ -1,77 +1,79 @@
 import streamlit as st
 
 from .. import db
+from ..i18n import t
 
 
 def render():
     if db.user():
-        st.title("Account")
-        st.write(f"Signed in as {db.user()['email']}.")
-        if db.is_admin():
-            st.caption("You have reviewer access to the Verification page.")
-        with st.expander("Change password"):
+        st.title(t("Account"))
+        st.write(t("Signed in as {email}.", email=db.user()["email"]))
+        if db.is_super():
+            st.caption(t("You are a super admin."))
+        elif db.is_admin():
+            st.caption(t("You have AIA Canada staff access."))
+        with st.expander(t("Change password")):
             _password_form("change_pw")
-        if st.button("Sign out"):
+        if st.button(t("Sign out")):
             db.sign_out()
             st.rerun()
         return
 
-    st.title("Sign in")
-    st.write("For collision repair shops and AIA Canada staff. Looking for a repair shop? You don't need an account: "
-             "use Find a shop.")
-    t_in, t_up = st.tabs(["Sign in", "Create account"])
+    st.title(t("Sign in"))
+    st.write(t("For collision repair shops and AIA Canada staff. Looking for a repair shop? You do not need an account: use Find a shop."))
+    t_in, t_up = st.tabs([t("Sign in"), t("Create an account")])
     with t_in:
         with st.form("sign_in"):
-            email = st.text_input("Email", autocomplete="email")
-            pw = st.text_input("Password", type="password", autocomplete="current-password")
-            if st.form_submit_button("Sign in", type="primary"):
+            email = st.text_input(t("Email"), autocomplete="email")
+            pw = st.text_input(t("Password"), type="password", autocomplete="current-password")
+            if st.form_submit_button(t("Sign in"), type="primary"):
                 try:
                     db.sign_in(email.strip(), pw)
                     st.rerun()
                 except Exception:
-                    st.error("Email or password is incorrect, or the email address hasn't been confirmed yet.")
+                    st.error(t("The email or password is incorrect, or the email address has not been confirmed yet."))
     with t_up:
         with st.form("sign_up"):
-            email = st.text_input("Work email", autocomplete="email")
-            pw = st.text_input("Password", type="password", help="At least 8 characters", autocomplete="new-password")
-            pw2 = st.text_input("Confirm password", type="password", autocomplete="new-password")
-            if st.form_submit_button("Create account", type="primary"):
+            email = st.text_input(t("Work email"), autocomplete="email")
+            pw = st.text_input(t("Password"), type="password", help=t("At least eight characters"), autocomplete="new-password")
+            pw2 = st.text_input(t("Confirm password"), type="password", autocomplete="new-password")
+            if st.form_submit_button(t("Create an account"), type="primary"):
                 if len(pw) < 8:
-                    st.error("Use at least 8 characters for your password.")
+                    st.error(t("Use at least eight characters for your password."))
                 elif pw != pw2:
-                    st.error("The passwords don't match.")
+                    st.error(t("The passwords do not match."))
                 else:
                     try:
                         if db.sign_up(email.strip(), pw):
                             st.rerun()
-                        st.success("Check your email to confirm your account, then sign in.")
+                        st.success(t("Check your email to confirm your account, then sign in."))
                     except Exception as e:
-                        st.error(f"The account couldn't be created. {getattr(e, 'message', '')}")
+                        st.error(t("The account could not be created. {detail}", detail=getattr(e, "message", "")))
 
 
 def _password_form(key):
     with st.form(key, clear_on_submit=True):
-        pw = st.text_input("New password", type="password", help="At least 8 characters", autocomplete="new-password")
-        pw2 = st.text_input("Confirm new password", type="password", autocomplete="new-password")
-        if st.form_submit_button("Save password", type="primary"):
+        pw = st.text_input(t("New password"), type="password", help=t("At least eight characters"), autocomplete="new-password")
+        pw2 = st.text_input(t("Confirm new password"), type="password", autocomplete="new-password")
+        if st.form_submit_button(t("Save password"), type="primary"):
             if len(pw) < 8:
-                st.error("Use at least 8 characters.")
+                st.error(t("Use at least eight characters for your password."))
             elif pw != pw2:
-                st.error("The passwords don't match.")
+                st.error(t("The passwords do not match."))
             else:
                 try:
                     db.change_password(pw)
                     st.session_state.goto_facility = True
                     st.rerun()
                 except Exception as e:
-                    st.error(f"The password couldn't be changed. {getattr(e, 'message', '')}")
+                    st.error(t("The password could not be changed. {detail}", detail=getattr(e, "message", "")))
 
 
 def set_password():
     """Shown instead of everything else when someone signs in with a temporary password."""
-    st.title("Choose your password")
-    st.write(f"You signed in as {db.user()['email']} with a temporary password. Choose your own to continue.")
+    st.title(t("Choose your password"))
+    st.write(t("You signed in as {email} with a temporary password. Choose your own password to continue.", email=db.user()["email"]))
     _password_form("first_pw")
-    if st.button("Sign out"):
+    if st.button(t("Sign out")):
         db.sign_out()
         st.rerun()

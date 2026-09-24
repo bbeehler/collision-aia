@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, timezone
 
 from .config import REQS
+from .i18n import fmt_date, t
 
 
 def ts(value):
@@ -21,8 +22,7 @@ def ts(value):
 
 
 def fmt(value):
-    d = ts(value)
-    return d.strftime("%b %-d, %Y") if d else ""
+    return fmt_date(ts(value))
 
 
 def now():
@@ -38,10 +38,16 @@ def claim_state(c):
     return c.get("status") or "pending"
 
 
+# English labels; translate with t() where shown. Colours map to the AIA Canada palette in .streamlit/config.toml.
 CLAIM_LABEL = {
-    "pending": ("In review", "orange"), "review": ("In review", "orange"), "recheck": ("Re-check due", "orange"),
-    "confirmed": ("Confirmed", "green"), "not_found": ("Couldn't confirm", "red"), "expired": ("Certificate expired", "red"),
+    "pending": ("In review", "blue"), "review": ("In review", "blue"), "recheck": ("Re-check due", "blue"),
+    "confirmed": ("Confirmed", "green"), "not_found": ("Could not confirm", "red"), "expired": ("Certificate expired", "red"),
 }
+
+
+def claim_label(state):
+    label, color = CLAIM_LABEL[state]
+    return t(label), color
 
 
 def req_counts(answers):
@@ -54,19 +60,19 @@ def req_counts(answers):
 def profile_missing(f):
     miss = []
     if not f.get("legal_name"):
-        miss.append("legal business name")
+        miss.append(t("legal business name"))
     if not f.get("street"):
-        miss.append("street address")
+        miss.append(t("street address"))
     if not f.get("city"):
-        miss.append("city")
+        miss.append(t("city"))
     if not f.get("province"):
-        miss.append("province or territory")
+        miss.append(t("province or territory"))
     if not re.match(r"^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$", (f.get("postal") or "").strip()):
-        miss.append("valid postal code")
+        miss.append(t("valid postal code"))
     if not f.get("rep_name"):
-        miss.append("authorized representative")
+        miss.append(t("authorized representative"))
     if not f.get("rep_email"):
-        miss.append("representative email")
+        miss.append(t("representative email"))
     return miss
 
 
@@ -100,23 +106,32 @@ def status(f, claims, decls):
 
 STATUS = {
     "draft": ("Self-check in progress", "gray"), "ready": ("Ready to declare", "blue"),
-    "verifying": ("Declared, credentials in review", "orange"), "action": ("Action needed on credentials", "red"),
+    "verifying": ("Declared, credentials in review", "blue"), "action": ("Action needed on credentials", "red"),
     "badge": ("Badge active", "green"), "expired": ("Declaration expired", "red"),
     "suspended": ("Revoked by AIA Canada", "red"),
 }
 
 
+def status_label(key):
+    label, color = STATUS[key]
+    return t(label), color
+
+
 def status_line(f, claims, decls):
-    st_ = status(f, claims, decls)
+    key = status(f, claims, decls)
     c = req_counts(f.get("answers"))
     d = active_declaration(decls) or latest_declaration(decls)
-    return {
-        "draft": f"{c['total'] - c['yes']} of {c['total']} requirements still need a yes.",
-        "ready": "Every requirement is answered yes. Check your credentials, then declare.",
-        "verifying": "Your declaration is in. Your credentials are being confirmed with the program administrators.",
-        "action": "One or more credentials couldn't be confirmed. Update or remove them to receive your badge.",
-        "badge": f"Your badge is active until {fmt(d and d['expires_at'])}.",
-        "expired": f"Your declaration expired on {fmt(d and d['expires_at'])}. Recheck and declare again.",
-        "suspended": f"AIA Canada revoked this facility on {fmt(f.get('suspended_at'))}: {f.get('suspended_reason') or ''} "
-                     "Contact AIA Canada to discuss reinstatement.",
-    }[st_]
+    if key == "draft":
+        return t("{n} of {total} requirements still need a yes.", n=c["total"] - c["yes"], total=c["total"])
+    if key == "ready":
+        return t("Every requirement is answered yes. Check your credentials, then declare.")
+    if key == "verifying":
+        return t("Your declaration is in. Your credentials are being confirmed with the program administrators.")
+    if key == "action":
+        return t("One or more credentials could not be confirmed. Update or remove them to receive your badge.")
+    if key == "badge":
+        return t("Your badge is active until {date}.", date=fmt(d and d["expires_at"]))
+    if key == "expired":
+        return t("Your declaration expired on {date}. Check your answers and declare again.", date=fmt(d and d["expires_at"]))
+    return t("AIA Canada revoked this facility on {date}: {reason} Contact AIA Canada to discuss reinstatement.",
+             date=fmt(f.get("suspended_at")), reason=f.get("suspended_reason") or "")

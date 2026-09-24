@@ -1,10 +1,37 @@
+# AIA Canada design system: dark-blue and red primaries, light-blue and blue-tint secondaries,
+# square corners, no shadows or gradients, Sofia Pro (Arial fallback).
 [theme]
 base = "light"
-primaryColor = "#1D4F91"
-backgroundColor = "#F4F6F5"
-secondaryBackgroundColor = "#E4E7E5"
-textColor = "#1B2126"
-font = "sans serif"
+primaryColor = "#e21c47"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f2f7fa"
+textColor = "#192b56"
+linkColor = "#192b56"
+borderColor = "#84c8e3"
+baseRadius = "none"
+buttonRadius = "none"
+font = "'Sofia Pro', sofia-pro, Arial, sans-serif"
+headingFont = "'Sofia Pro', sofia-pro, Arial, sans-serif"
+# Status colours, kept within the brand palette
+greenColor = "#192b56"
+greenTextColor = "#192b56"
+greenBackgroundColor = "#d6edf6"
+blueColor = "#192b56"
+blueTextColor = "#192b56"
+blueBackgroundColor = "#f2f7fa"
+grayColor = "#192b56"
+grayTextColor = "#192b56"
+grayBackgroundColor = "#f2f7fa"
+orangeColor = "#192b56"
+orangeTextColor = "#192b56"
+orangeBackgroundColor = "#f2f7fa"
+yellowColor = "#192b56"
+yellowTextColor = "#192b56"
+yellowBackgroundColor = "#f2f7fa"
+redColor = "#e21c47"
+redTextColor = "#e21c47"
+redBackgroundColor = "#ffffff"
+chartCategoricalColors = ["#192b56", "#e21c47", "#84c8e3"]
 
 [client]
 toolbarMode = "minimal"

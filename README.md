@@ -103,6 +103,39 @@ A strong match on a listed brand is confirmed automatically and re-checked every
 - Changing any answer away from yes withdraws the active declaration automatically.
 - Shops see only their own facilities. The public directory exposes only badge-holding facilities and their public details.
 
+## Look and feel
+
+The app follows the AIA Canada design system: dark-blue and red primaries with light-blue and blue-tint secondaries,
+square corners, no shadows, the red edge bar down the left of every page, and the supplied logo files only
+(`assets/`). Colours and corners are set in `.streamlit/config.toml`; the edge bar, header, footer and banner are in
+`app/theme.py`. The badge (`app/badge.py`) uses the reverse logo on dark blue.
+
+Sofia Pro is licensed through Adobe Fonts. To use it, add the app's address to your Adobe Fonts web project and put
+the kit ID in the `ADOBE_FONTS_KIT` secret. Without it, the app falls back to Arial.
+
+## English and French
+
+Every screen is bilingual. Visitors switch with the **Français / English** link at the top right, and any link can
+open in French by adding `?lang=fr`, for example `https://your-app.streamlit.app/directory?lang=fr`.
+
+- Interface text: `app/i18n_fr.py`, keyed by the English wording. Have Communications review it before launch.
+- The 27 requirements use the wording of AIA Canada's English and French editions of the Statement (`app/config.py`).
+- AI explanations and gap plans are written in the visitor's language.
+- To add or change English text, wrap it in `t("...")` and add the French to `app/i18n_fr.py`. A string without a
+  French entry shows in English.
+
+## Putting it on aiacanada.com
+
+In Elementor, add an **HTML** widget to a page and paste:
+
+```html
+<iframe src="https://your-app.streamlit.app/?embed=true" title="Check and Declare"
+        style="width:100%; height:1600px; border:0;" loading="lazy"></iframe>
+```
+
+On French pages, use `?embed=true&lang=fr`. You can embed a single page, such as `/directory?embed=true` for
+Find a shop or `/check?embed=true` for Check a badge.
+
 ## Tests
 
 ```bash

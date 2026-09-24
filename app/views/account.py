@@ -9,6 +9,8 @@ def render():
         st.write(f"Signed in as {db.user()['email']}.")
         if db.is_admin():
             st.caption("You have reviewer access to the Verification page.")
+        with st.expander("Change password"):
+            _password_form("change_pw")
         if st.button("Sign out"):
             db.sign_out()
             st.rerun()
@@ -45,3 +47,31 @@ def render():
                         st.success("Check your email to confirm your account, then sign in.")
                     except Exception as e:
                         st.error(f"The account couldn't be created. {getattr(e, 'message', '')}")
+
+
+def _password_form(key):
+    with st.form(key, clear_on_submit=True):
+        pw = st.text_input("New password", type="password", help="At least 8 characters", autocomplete="new-password")
+        pw2 = st.text_input("Confirm new password", type="password", autocomplete="new-password")
+        if st.form_submit_button("Save password", type="primary"):
+            if len(pw) < 8:
+                st.error("Use at least 8 characters.")
+            elif pw != pw2:
+                st.error("The passwords don't match.")
+            else:
+                try:
+                    db.change_password(pw)
+                    st.session_state.goto_facility = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"The password couldn't be changed. {getattr(e, 'message', '')}")
+
+
+def set_password():
+    """Shown instead of everything else when someone signs in with a temporary password."""
+    st.title("Choose your password")
+    st.write(f"You signed in as {db.user()['email']} with a temporary password. Choose your own to continue.")
+    _password_form("first_pw")
+    if st.button("Sign out"):
+        db.sign_out()
+        st.rerun()

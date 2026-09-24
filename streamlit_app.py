@@ -18,6 +18,11 @@ db.restore_session()
 signed_in = db.user() is not None
 staff = signed_in and db.is_admin()
 
+if signed_in and st.session_state.get("must_change_password"):
+    st.navigation([st.Page(account.set_password, title="Choose your password", icon=":material/key:",
+                           url_path="set-password", default=True)]).run()
+    st.stop()
+
 # Pages everyone can use, with or without an account
 find_page = st.Page(directory.render, title="Find a shop", icon=":material/storefront:", url_path="directory")
 check_page = st.Page(badge_check.render, title="Check a badge", icon=":material/verified:", url_path="check")
@@ -29,9 +34,11 @@ if staff:
     concerns_page = st.Page(admin.concerns, title="Concerns", icon=":material/report:", url_path="concerns")
     dash_page = st.Page(lambda: admin.dashboard(verify_page, facilities_page, concerns_page), title="Dashboard",
                         icon=":material/dashboard:", url_path="dashboard", default=True)
-    reviewers_page = st.Page(admin.reviewers, title="Reviewers", icon=":material/group:", url_path="reviewers")
+    admin_pages = [dash_page, verify_page, facilities_page, concerns_page]
+    if db.is_super():
+        admin_pages.append(st.Page(admin.staff, title="Staff", icon=":material/group:", url_path="staff"))
     landing = dash_page
-    sections = {"Administration": [dash_page, verify_page, facilities_page, concerns_page, reviewers_page],
+    sections = {"Administration": admin_pages,
                 "Public site": [find_page, check_page], "Account": [account_page]}
 elif signed_in:
     landing = st.Page(facility.render, title="My facility", icon=":material/home_repair_service:", url_path="facility", default=True)
@@ -45,7 +52,7 @@ with st.sidebar:
     st.markdown("**Check and Declare**")
     st.caption("AIA Canada Statement on minimum collision repair requirements")
     if signed_in:
-        st.caption(f"Signed in as {db.user()['email']}" + (" (AIA Canada staff)" if staff else ""))
+        st.caption(f"Signed in as {db.user()['email']}" + (" (super admin)" if db.is_super() else " (AIA Canada staff)" if staff else ""))
 
 nav = st.navigation(sections)
 if signed_in and st.session_state.pop("goto_facility", False):

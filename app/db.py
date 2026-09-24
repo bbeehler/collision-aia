@@ -29,10 +29,16 @@ def _set_session(session):
     st.session_state.user = {"id": session.user.id, "email": session.user.email}
     st.session_state.goto_facility = True
     sb().postgrest.auth(session.access_token)
+    meta = getattr(session.user, "user_metadata", None) or {}
+    st.session_state.must_change_password = bool(meta.get("must_change_password"))
     try:
         st.session_state.is_admin = bool(sb().rpc("is_admin").execute().data)
     except Exception:
         st.session_state.is_admin = False
+    try:
+        st.session_state.is_super = bool(sb().rpc("is_super_admin").execute().data) if st.session_state.is_admin else False
+    except Exception:
+        st.session_state.is_super = False
 
 
 def restore_session():
@@ -67,12 +73,21 @@ def sign_out():
         sb().auth.sign_out()
     except Exception:
         pass
-    for k in ["_sb", "user", "is_admin", "facility_id"]:
+    for k in ["_sb", "user", "is_admin", "is_super", "must_change_password", "facility_id", "new_staff"]:
         st.session_state.pop(k, None)
 
 
 def is_admin():
     return bool(st.session_state.get("is_admin"))
+
+
+def is_super():
+    return bool(st.session_state.get("is_super"))
+
+
+def change_password(new_password):
+    sb().auth.update_user({"password": new_password, "data": {"must_change_password": False}})
+    st.session_state.must_change_password = False
 
 
 # ---------- shop data ----------
@@ -197,9 +212,70 @@ def reviewers():
     return sb().rpc("list_reviewers").execute().data
 
 
-def add_reviewer(email):
-    return sb().rpc("add_reviewer", {"p_email": email}).execute().data
-
-
 def remove_reviewer(user_id):
     return sb().rpc("remove_reviewer", {"p_user": user_id}).execute().data
+
+
+# ---------- super admins ----------
+def _service():
+    """Service-role client, used only for super-admin actions the database can't do itself (creating accounts, files)."""
+    key = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY")
+    return create_client(st.secrets["SUPABASE_URL"], key) if key else None
+
+
+def can_create_accounts():
+    try:
+        return bool(st.secrets.get("SUPABASE_SERVICE_ROLE_KEY"))
+    except Exception:
+        return False
+
+
+def add_staff(email, role):
+    return sb().rpc("add_staff", {"p_email": email, "p_role": role}).execute().data
+
+
+def set_staff_role(user_id, role):
+    return sb().rpc("set_staff_role", {"p_user": user_id, "p_role": role}).execute().data
+
+
+def create_staff_account(email, role):
+    """Creates the person's account with a temporary password (if they don't have one) and makes them staff.
+    Returns (temporary_password or None if they already had an account, result of add_staff)."""
+    if not is_super():
+        raise PermissionError("Super admins only")
+    import secrets as _secrets
+    import string
+    alphabet = string.ascii_letters + string.digits
+    password = "".join(_secrets.choice(alphabet) for _ in range(12))
+    try:
+        _service().auth.admin.create_user({"email": email, "password": password, "email_confirm": True,
+                                           "user_metadata": {"must_change_password": True}})
+    except Exception as e:
+        text = str(e).lower()
+        if "already" in text or "registered" in text or "exists" in text:
+            password = None
+        else:
+            raise
+    return password, add_staff(email, role)
+
+
+def suspend_facility(fid, reason):
+    return sb().rpc("suspend_facility", {"p_facility": fid, "p_reason": reason}).execute().data
+
+
+def reinstate_facility(fid):
+    return sb().rpc("reinstate_facility", {"p_facility": fid}).execute().data
+
+
+def delete_facility(fid):
+    res = sb().rpc("delete_facility", {"p_facility": fid}).execute().data
+    svc = _service()
+    if svc and res == "deleted":
+        try:
+            files = svc.storage.from_("verification-evidence").list(fid) or []
+            paths = [f"{fid}/{f['name']}" for f in files]
+            if paths:
+                svc.storage.from_("verification-evidence").remove(paths)
+        except Exception:
+            pass
+    return res

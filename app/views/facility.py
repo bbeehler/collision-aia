@@ -433,6 +433,11 @@ def _review(f, claims):
 
 # ---------------------------------------------------------------- step 5
 def _declare(f, claims, decls):
+    if f.get("suspended_at"):
+        st.subheader("Declare")
+        st.error(f"AIA Canada revoked this facility on {fmt(f['suspended_at'])}. Reason: {f.get('suspended_reason') or 'not given'}. "
+                 "You can't declare until AIA Canada reinstates it. Contact AIA Canada to discuss.")
+        return
     active = active_declaration(decls)
     if active:
         _active_declaration(f, claims, decls, active)

@@ -150,6 +150,46 @@ def _facility_detail(f, claims, decls):
             st.dataframe([{"When": fmt(h["at"]), "Event": h["type"].replace("_", " "), "Detail": h.get("detail") or ""} for h in hist], hide_index=True)
         else:
             st.caption("No activity recorded.")
+    if db.is_super():
+        _super_actions(f)
+
+
+def _super_actions(f):
+    st.markdown("#### Super admin actions")
+    name = shop_name(f)
+    c1, c2 = st.columns(2)
+    if f.get("suspended_at"):
+        c1.error(f"Revoked {fmt(f['suspended_at'])}: {f.get('suspended_reason') or ''}")
+        if c1.button("Reinstate facility", key=f"reinstate_{f['id']}"):
+            db.reinstate_facility(f["id"])
+            flash(f"{name} reinstated. The shop can declare again.")
+            st.rerun()
+    else:
+        with c1.popover("Revoke facility"):
+            st.write("Withdraws the badge, removes the shop from the directory, and blocks it from declaring again until "
+                     "you reinstate it. The shop sees your reason.")
+            reason = st.text_input("Reason, shown to the shop", key=f"susp_reason_{f['id']}")
+            if st.button("Revoke facility", type="primary", key=f"susp_{f['id']}"):
+                if not reason.strip():
+                    st.error("Enter a reason.")
+                else:
+                    try:
+                        db.suspend_facility(f["id"], reason.strip())
+                        flash(f"{name} revoked.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"That didn't save. {err_text(e)}")
+    with c2.popover("Delete facility"):
+        st.warning("Permanently deletes this facility with its answers, credentials, declarations, history and screenshots. "
+                   "This can't be undone. Consumer concerns about it are kept.")
+        typed = st.text_input(f"Type {name} to confirm", key=f"del_confirm_{f['id']}")
+        if st.button("Delete permanently", type="primary", key=f"del_{f['id']}", disabled=typed.strip() != name):
+            try:
+                db.delete_facility(f["id"])
+                flash(f"{name} deleted.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"That didn't work. {err_text(e)}")
 
 
 # ---------------------------------------------------------------- concerns
@@ -190,35 +230,88 @@ def concerns():
                         st.error(f"That didn't save. {err_text(e)}")
 
 
-# ---------------------------------------------------------------- reviewers
-def reviewers():
-    if not _guard():
+# ---------------------------------------------------------------- staff (super admins)
+ROLES = {"reviewer": "Reviewer", "super_admin": "Super admin"}
+
+
+def _role_changed(user_id, email, key):
+    role = st.session_state.get(key)
+    try:
+        db.set_staff_role(user_id, role)
+        flash(f"{email} is now a {ROLES[role].lower()}.")
+    except Exception as e:
+        flash(f"The role for {email} couldn't be changed. {err_text(e)}", "error")
+
+
+def staff():
+    if not db.is_super():
+        st.error("This page is for super admins.")
         return
-    st.title("Reviewers")
+    st.title("Staff")
     show_flash()
-    st.write("Reviewers are AIA Canada staff who can see every facility, confirm credentials and respond to concerns.")
+    st.write("**Reviewers** confirm credentials, handle consumer concerns and can revoke a badge. **Super admins** can also "
+             "manage staff and revoke or delete facilities.")
+
+    new = st.session_state.get("new_staff")
+    if new:
+        with st.container(border=True):
+            st.success(f"Account created for **{new['email']}** as {ROLES[new['role']].lower()}.")
+            st.write("Send them this temporary password. They'll be asked to choose their own the first time they sign in.")
+            st.code(new["password"], language=None)
+            st.caption("For security, this password isn't shown again once you close this box.")
+            if st.button("Done"):
+                st.session_state.pop("new_staff", None)
+                st.rerun()
+
     try:
         rows = db.reviewers()
     except Exception:
-        st.error("Reviewers couldn't be loaded. Check that the 003 database update has been run.")
+        st.error("Staff couldn't be loaded. Check that the 004 database update has been run.")
         return
     for r in rows:
-        a, b = st.columns([4, 1], vertical_alignment="center")
-        a.write(f"{r['email']}  \n:gray[Added {fmt(r['added_at'])}]")
-        if r["user_id"] != db.uid() and b.button("Remove", key=f"rm_rev_{r['user_id']}"):
-            db.remove_reviewer(r["user_id"])
-            flash(f"{r['email']} is no longer a reviewer.")
-            st.rerun()
-    st.markdown("#### Add a reviewer")
-    st.caption("They need an account first: ask them to create one on the Sign in page with their work email.")
-    with st.form("add_reviewer", clear_on_submit=True):
-        email = st.text_input("Work email")
-        if st.form_submit_button("Add reviewer", type="primary"):
+        me = r["user_id"] == db.uid()
+        with st.container(border=True):
+            a, b, c = st.columns([3, 2, 1], vertical_alignment="center")
+            a.write(f"**{r['email']}**  \n:gray[Added {fmt(r['added_at'])}]")
+            if me:
+                b.write(f"{ROLES.get(r['role'], r['role'])} (you)")
+                continue
+            key = f"role_{r['user_id']}"
+            b.selectbox("Role", list(ROLES), index=list(ROLES).index(r["role"]) if r["role"] in ROLES else 0,
+                        format_func=ROLES.get, key=key, label_visibility="collapsed",
+                        on_change=_role_changed, args=(r["user_id"], r["email"], key))
+            if c.button("Remove", key=f"rm_staff_{r['user_id']}"):
+                db.remove_reviewer(r["user_id"])
+                flash(f"{r['email']} no longer has staff access. Their account still exists and works as a shop account.")
+                st.rerun()
+
+    st.markdown("#### Add staff")
+    direct = db.can_create_accounts()
+    st.caption("Enter their work email. If they don't have an account yet, one is created for you with a temporary password."
+               if direct else
+               "They need an account first. To create accounts for staff yourself, add SUPABASE_SERVICE_ROLE_KEY to the app's "
+               "secrets (see README, step 4).")
+    with st.form("add_staff", clear_on_submit=True):
+        c1, c2 = st.columns([2, 1])
+        email = c1.text_input("Work email")
+        role = c2.selectbox("Role", list(ROLES), format_func=ROLES.get)
+        if st.form_submit_button("Add staff", type="primary"):
+            email = email.strip()
+            if "@" not in email:
+                st.error("Enter a valid email address.")
+                return
             try:
-                res = db.add_reviewer(email.strip())
-                if res == "added":
-                    flash(f"{email.strip()} is now a reviewer. They'll see the staff pages next time they sign in.")
+                if direct:
+                    password, res = db.create_staff_account(email, role)
+                    if password:
+                        st.session_state.new_staff = {"email": email, "password": password, "role": role}
+                    else:
+                        flash(f"{email} already had an account and is now a {ROLES[role].lower()}. They can sign in with their existing password.")
                     st.rerun()
-                st.error("There's no account with that email yet. Ask them to create one first.")
+                res = db.add_staff(email, role)
+                if res == "added":
+                    flash(f"{email} is now a {ROLES[role].lower()}.")
+                    st.rerun()
+                st.error("There's no account with that email yet. Ask them to create one on the Sign in page, then add them here.")
             except Exception as e:
                 st.error(f"That didn't work. {err_text(e)}")

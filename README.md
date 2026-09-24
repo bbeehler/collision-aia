@@ -56,14 +56,23 @@ Then open the **Actions** tab, enable workflows if asked, and run **Verify crede
    - `GITHUB_TOKEN` and `GITHUB_REPO` turn on the **Run automated checks now** button. The token should be a fine-grained personal access token with **Actions: read and write** on this repository.
 4. Deploy, then copy the app address into Supabase's **Site URL** (step 2.3).
 
-### 5. Make yourself a reviewer
+### 5. Make yourself a super admin
 Create an account in the app, then run this in the Supabase SQL Editor:
 
 ```sql
-insert into public.admins (user_id) select id from auth.users where email = 'you@aiacanada.com';
+insert into public.admins (user_id, role) select id, 'super_admin' from auth.users where email = 'you@aiacanada.com';
 ```
 
-Sign out and back in. The **Verification** page appears.
+Sign out and back in. The staff pages appear, including **Staff**, where you add everyone else.
+
+### Database updates
+Run each file in `supabase/migrations/` once, in order, in the Supabase SQL Editor: `001` at setup, then `002`, `003` and `004` as they arrive.
+
+### Staff roles
+- **Reviewers** confirm credentials, handle consumer concerns and can revoke a badge.
+- **Super admins** can also add and remove staff, and revoke, reinstate or delete facilities.
+
+To let super admins create staff accounts directly (with a temporary password the person changes at first sign-in), add `SUPABASE_SERVICE_ROLE_KEY` to the Streamlit secrets. Without it, staff create their own account first and you add them by email.
 
 ## How it works
 

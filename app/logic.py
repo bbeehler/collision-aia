@@ -82,6 +82,8 @@ def latest_declaration(decls):
 
 
 def status(f, claims, decls):
+    if f.get("suspended_at"):
+        return "suspended"
     active = active_declaration(decls)
     if not active:
         last = latest_declaration(decls)
@@ -100,6 +102,7 @@ STATUS = {
     "draft": ("Self-check in progress", "gray"), "ready": ("Ready to declare", "blue"),
     "verifying": ("Declared, credentials in review", "orange"), "action": ("Action needed on credentials", "red"),
     "badge": ("Badge active", "green"), "expired": ("Declaration expired", "red"),
+    "suspended": ("Revoked by AIA Canada", "red"),
 }
 
 
@@ -114,4 +117,6 @@ def status_line(f, claims, decls):
         "action": "One or more credentials couldn't be confirmed. Update or remove them to receive your badge.",
         "badge": f"Your badge is active until {fmt(d and d['expires_at'])}.",
         "expired": f"Your declaration expired on {fmt(d and d['expires_at'])}. Recheck and declare again.",
+        "suspended": f"AIA Canada revoked this facility on {fmt(f.get('suspended_at'))}: {f.get('suspended_reason') or ''} "
+                     "Contact AIA Canada to discuss reinstatement.",
     }[st_]

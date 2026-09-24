@@ -14,9 +14,9 @@ def render():
             st.rerun()
         return
 
-    st.title("Check and Declare")
-    st.write("Check your collision repair facility against AIA Canada's Statement on minimum requirements, list your "
-             "credentials, and declare when every item is met. AIA Canada confirms your credentials, then issues your badge.")
+    st.title("Sign in")
+    st.write("For collision repair shops and AIA Canada staff. Looking for a repair shop? You don't need an account: "
+             "use Find a shop.")
     t_in, t_up = st.tabs(["Sign in", "Create account"])
     with t_in:
         with st.form("sign_in"):

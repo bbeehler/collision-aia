@@ -164,3 +164,42 @@ def evidence_url(path):
 # ---------- public ----------
 def directory():
     return sb().rpc("get_directory").execute().data
+
+
+# ---------- consumers ----------
+def check_badge(code):
+    rows = sb().rpc("check_badge", {"p_code": code}).execute().data
+    return rows[0] if rows else None
+
+
+def submit_concern(facility_id, name, contact, message):
+    return sb().rpc("submit_concern", {"p_facility": facility_id, "p_name": name, "p_contact": contact, "p_message": message}).execute().data
+
+
+# ---------- administration ----------
+def concerns():
+    return sb().table("concerns").select("*").order("submitted_at", desc=True).execute().data
+
+
+def update_concern(cid, status, note):
+    sb().table("concerns").update({"status": status, "admin_note": note or None, "updated_at": _now(), "updated_by": uid()}).eq("id", cid).execute()
+
+
+def history(fid, limit=100):
+    return sb().table("facility_history").select("*").eq("facility_id", fid).order("at", desc=True).limit(limit).execute().data
+
+
+def revoke(did, reason):
+    sb().table("declarations").update({"withdrawn_at": _now(), "withdrawn_reason": reason}).eq("id", did).execute()
+
+
+def reviewers():
+    return sb().rpc("list_reviewers").execute().data
+
+
+def add_reviewer(email):
+    return sb().rpc("add_reviewer", {"p_email": email}).execute().data
+
+
+def remove_reviewer(user_id):
+    return sb().rpc("remove_reviewer", {"p_user": user_id}).execute().data

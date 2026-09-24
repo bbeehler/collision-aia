@@ -1,0 +1,35 @@
+name: Keep app awake
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every six hours
+  workflow_dispatch:
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - name: Visit the app, and wake it if it is asleep
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              page = p.chromium.launch().new_page()
+              page.goto(os.environ["APP_URL"], timeout=90000)
+              page.wait_for_timeout(8000)
+              wake = page.get_by_role("button", name="Yes, get this app back up!")
+              if wake.count():
+                  print("App was asleep. Waking it.")
+                  wake.first.click()
+                  page.wait_for_timeout(60000)
+              else:
+                  print("App is awake.")
+          PY
